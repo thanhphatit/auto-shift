@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoWorkScheduler - Lịch Làm Việc Tự Động</title>
+<style>
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+h1 { text-align: center; color: #343a40; margin-bottom: 20px; }
+.container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+label { display: block; margin-top: 10px; font-weight: 500; color: #495057; }
+input, select, button { margin-top: 5px; padding: 6px 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 14px; }
+button { cursor: pointer; background-color: #0d6efd; color: white; border: none; transition: 0.3s; }
+button:hover { background-color: #0b5ed7; }
+#employeeInputs input { display: inline-block; margin-right: 10px; margin-top: 5px; width: 150px; }
+.days label { display: inline-block; margin-right: 10px; }
+#schedule { margin-top: 20px; border-collapse: collapse; width: 100%; font-size: 14px; }
+#schedule th, #schedule td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
+#schedule th { background-color: #0d6efd; color: white; }
+#schedule tr:nth-child(even) { background-color: #f1f3f5; }
+#schedule tr:hover { background-color: #e9ecef; }
+.emp-chip { display:inline-block; margin:2px 3px; padding:3px 8px; border-radius:10px; background:#0d6efd; color:white; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>AutoShift - Lịch Làm Việc Tự Động</h1>
+
+<label>Số nhân viên: <input type="number" id="numEmployees" min="1" value="5"></label>
+<button onclick="createEmployeeInputs()">Tạo danh sách nhân viên</button>
+<div id="employeeInputs"></div>
+
+<label>Chọn ngày làm việc:</label>
+<div class="days">
+  <label><input type="checkbox" class="day" value="Mon" checked> Thứ 2</label>
+  <label><input type="checkbox" class="day" value="Tue" checked> Thứ 3</label>
+  <label><input type="checkbox" class="day" value="Wed" checked> Thứ 4</label>
+  <label><input type="checkbox" class="day" value="Thu" checked> Thứ 5</label>
+  <label><input type="checkbox" class="day" value="Fri" checked> Thứ 6</label>
+  <label><input type="checkbox" class="day" value="Sat" checked> Thứ 7</label>
+  <label><input type="checkbox" class="day" value="Sun" checked> Chủ nhật</label>
+</div>
+
+<label>Nhập ca làm việc (vd: 6:00-14:00,8:00-16:00,14:00-22:00,15:30-23:30):</label>
+<input type="text" id="shifts" value="6:00-14:00,8:00-16:00,14:00-22:00,15:30-23:30">
+
+<label>Số nhân viên / ca (vd: 2,2,2,2 hoặc auto):</label>
+<input type="text" id="staffPerShiftPerShift" value="2,2,2,2">
+
+<br><br>
+<button onclick="generateSchedule()">Tạo lịch</button>
+<button onclick="downloadCSV()">Tải CSV</button>
+
+<table id="schedule"></table>
+</div>
+
+<script>
+let employees = [];
+let scheduleData = [];
+
+// Tạo input tên nhân viên
+function createEmployeeInputs() {
+    const num = parseInt(document.getElementById('numEmployees').value);
+    const container = document.getElementById('employeeInputs');
+    container.innerHTML = '';
+    employees = [];
+    for (let i = 0; i < num; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = `NV${i+1}`;
+        input.id = `employee${i}`;
+        container.appendChild(input);
+        employees.push(input);
+    }
+}
+
+// Trộn mảng
+function shuffle(array) {
+    for (let i = array.length -1; i>0; i--) {
+        const j=Math.floor(Math.random()*(i+1));
+        [array[i],array[j]]=[array[j],array[i]];
+    }
+    return array;
+}
+
+// Phân tích số nhân viên mỗi ca
+function parseStaffPerShiftPerShift(input, numShifts){
+    if(input.trim().toLowerCase() === 'auto') return Array(numShifts).fill('auto');
+    const arr = input.split(',').map(s => s.trim());
+    if(arr.length !== numShifts) {
+        alert(`Nhập đúng số ca! Hiện có ${numShifts} ca, bạn nhập ${arr.length} số.`);
+        return null;
+    }
+    return arr.map(s => {
+        const n = parseInt(s);
+        return isNaN(n) ? 'auto' : n;
+    });
+}
+
+// Tạo lịch (mỗi nhân viên chỉ làm 1 ca/ngày)
+function generateSchedule(){
+    const employeeNames = employees.map((e,i)=>{
+        const name = e.value.trim();
+        return name!=='' ? name : `NV${i+1}`;
+    });
+    if(employeeNames.length===0){ alert('Nhập tên nhân viên!'); return; }
+
+    const days = Array.from(document.querySelectorAll('.day:checked')).map(d=>d.value);
+    if(days.length===0){ alert('Chọn ngày làm việc!'); return; }
+
+    const shifts = document.getElementById('shifts').value.split(',').map(s=>s.trim()).filter(s=>s);
+    const staffPerShiftArr = parseStaffPerShiftPerShift(document.getElementById('staffPerShiftPerShift').value, shifts.length);
+    if(!staffPerShiftArr) return;
+
+    scheduleData=[];
+
+    for(let day of days){
+        scheduleData.push({day, shifts:{}});
+        const assignedToday = new Set(); // ai đã làm ca hôm nay
+
+        for(let i=0;i<shifts.length;i++){
+            const shift = shifts[i];
+            let staffCount = staffPerShiftArr[i];
+            if(staffCount==='auto') staffCount = Math.min(employeeNames.length, 3);
+
+            // Kiểm tra đủ nhân viên chưa làm hôm nay
+            if(staffCount > employeeNames.length - assignedToday.size){
+                alert(`Không đủ nhân viên cho ca ${shift} ngày ${day}.`);
+                return;
+            }
+
+            const available = employeeNames.filter(emp => !assignedToday.has(emp));
+            shuffle(available);
+            const selected = available.slice(0, staffCount);
+
+            selected.forEach(emp => assignedToday.add(emp));
+            scheduleData[scheduleData.length-1].shifts[shift] = selected;
+        }
+    }
+
+    renderTable();
+}
+
+// Hiển thị bảng
+function renderTable(){
+    const table=document.getElementById('schedule');
+    table.innerHTML='';
+    if(scheduleData.length===0) return;
+    const thead=table.createTHead();
+    const headerRow=thead.insertRow();
+    headerRow.insertCell().innerText='Ngày / Ca';
+    Object.keys(scheduleData[0].shifts).forEach(shift=>{
+        headerRow.insertCell().innerText=shift;
+    });
+
+    const tbody=table.createTBody();
+    scheduleData.forEach(dayData=>{
+        const row=tbody.insertRow();
+        row.insertCell().innerText=dayData.day;
+        Object.values(dayData.shifts).forEach(empList=>{
+            const cell=row.insertCell();
+            empList.forEach(emp=>{
+                const span=document.createElement('span');
+                span.className='emp-chip';
+                span.innerText=emp;
+                cell.appendChild(span);
+            });
+        });
+    });
+}
+
+// Tải CSV
+function downloadCSV(){
+    if(scheduleData.length===0){ alert('Chưa tạo lịch!'); return; }
+    let csv='Ngày,';
+    csv+=Object.keys(scheduleData[0].shifts).join(',')+'\n';
+    scheduleData.forEach(d=>{
+        let line=[d.day];
+        Object.values(d.shifts).forEach(arr=>{
+            line.push(arr.join(' / '));
+        });
+        csv+=line.join(',')+'\n';
+    });
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='schedule.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Init mặc định
+window.onload=createEmployeeInputs;
+</script>
+</body>
+</html>
