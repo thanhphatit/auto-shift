@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoShift — Lịch Làm Việc</title>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <style>
         /* ─── TOKENS ─── */
         :root[data-theme="dark"] {
@@ -281,12 +283,50 @@
             box-shadow: 0 4px 24px var(--accent-glow);
         }
         .btn-generate:hover { box-shadow: 0 8px 32px var(--accent-glow); transform: translateY(-2px); }
-        .btn-csv {
-            background: var(--surface);
-            color: var(--cyan);
-            border: 1px solid var(--cyan);
+        /* standalone fallback – overridden inside .dl-group */
+        .btn-csv { color: var(--cyan); }
+        .btn-xlsx { color: var(--green); }
+
+        .dl-group {
+            display: flex;
+            align-items: stretch;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border2);
         }
-        .btn-csv:hover { background: var(--cyan); color: var(--bg); }
+        .dl-label {
+            padding: 0 14px;
+            font-size: 0.72rem;
+            font-family: 'DM Mono', monospace;
+            color: var(--text-muted);
+            background: var(--surface2);
+            display: flex;
+            align-items: center;
+            border-right: 1px solid var(--border2);
+            white-space: nowrap;
+            user-select: none;
+        }
+        .dl-group .btn {
+            border-radius: 0;
+            border: none !important;
+            border-left: 1px solid var(--border2) !important;
+        }
+        .dl-group .btn-csv {
+            background: var(--surface) !important;
+            color: var(--cyan) !important;
+        }
+        .dl-group .btn-csv:hover {
+            background: var(--cyan) !important;
+            color: var(--bg) !important;
+        }
+        .dl-group .btn-xlsx {
+            background: var(--surface) !important;
+            color: var(--green) !important;
+        }
+        .dl-group .btn-xlsx:hover {
+            background: var(--green) !important;
+            color: var(--bg) !important;
+        }
 
         /* ─── MSG BAR ─── */
         #msgBar {
@@ -578,7 +618,11 @@
     <!-- ACTION BUTTONS -->
     <div class="btn-bar">
         <button class="btn btn-generate" onclick="generateSchedule()">⚡ Xuất lịch ngẫu nhiên & xoay vòng</button>
-        <button class="btn btn-csv" onclick="downloadCSV()">↓ Tải file CSV</button>
+        <div class="dl-group">
+                <span class="dl-label">↓ Tải xuống</span>
+                <button class="btn btn-csv" onclick="downloadCSV()">.CSV</button>
+                <button class="btn btn-xlsx" onclick="downloadXLSX()">.XLSX</button>
+            </div>
     </div>
 
     <!-- SCHEDULE TABLE -->
@@ -878,8 +922,128 @@ function downloadCSV() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'AutoShiftSchedule.csv';
+    a.download = 'AutoShift_Schedule.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+}
+
+/* ─── XLSX ─── */
+function downloadXLSX() {
+    if (!scheduleData.length) return;
+
+    const shifts = Object.keys(scheduleData[0].shifts);
+    const wb = XLSX.utils.book_new();
+
+    /* ── Sheet 1: Lịch làm việc ── */
+    const schedRows = [['Ngày', ...shifts]];
+    scheduleData.forEach(d => {
+        const row = [d.day];
+        shifts.forEach(s => row.push(d.shifts[s].map(e => e.isOT ? e.name + ' (OT)' : e.name).join(', ')));
+        schedRows.push(row);
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(schedRows);
+
+    // Column widths
+    ws1['!cols'] = [{ wch: 14 }, ...shifts.map(() => ({ wch: 26 }))];
+
+    // Header style (row 0)
+    const headerRange = XLSX.utils.decode_range(ws1['!ref']);
+    for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws1[addr]) continue;
+        ws1[addr].s = {
+            font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Arial', sz: 10 },
+            fill: { fgColor: { rgb: '2C3E50' } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: {
+                top:    { style: 'thin', color: { rgb: '444444' } },
+                bottom: { style: 'thin', color: { rgb: '444444' } },
+                left:   { style: 'thin', color: { rgb: '444444' } },
+                right:  { style: 'thin', color: { rgb: '444444' } }
+            }
+        };
+    }
+
+    // Data rows
+    for (let R = 1; R <= headerRange.e.r; R++) {
+        const isEven = R % 2 === 0;
+        for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws1[addr]) ws1[addr] = { t: 's', v: '' };
+            const cellVal = String(ws1[addr].v || '');
+            const hasOT = cellVal.includes('(OT)');
+            ws1[addr].s = {
+                font: {
+                    name: 'Arial', sz: 9,
+                    color: { rgb: hasOT ? 'C0162E' : (C === 0 ? '444444' : '1A1D2E') },
+                    bold: C === 0
+                },
+                fill: { fgColor: { rgb: isEven ? 'F7F8FC' : 'FFFFFF' } },
+                alignment: { horizontal: C === 0 ? 'left' : 'center', vertical: 'center', wrapText: true },
+                border: {
+                    top:    { style: 'thin', color: { rgb: 'DDDDDD' } },
+                    bottom: { style: 'thin', color: { rgb: 'DDDDDD' } },
+                    left:   { style: 'thin', color: { rgb: 'DDDDDD' } },
+                    right:  { style: 'thin', color: { rgb: 'DDDDDD' } }
+                }
+            };
+        }
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws1, 'Lịch làm việc');
+
+    /* ── Sheet 2: Thống kê ── */
+    const stats = {};
+    employeeNodes.forEach(i => { if (i.value.trim()) stats[i.value.trim()] = 0; });
+    scheduleData.forEach(d => {
+        Object.values(d.shifts).forEach(list => {
+            list.forEach(e => { if (!e.isEmpty && stats[e.name] !== undefined) stats[e.name]++; });
+        });
+    });
+    const sorted = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    const maxStat = sorted.length ? sorted[0][1] : 1;
+
+    const statRows = [['Nhân viên', 'Tổng số ca', 'Tỷ lệ (%)']];
+    sorted.forEach(([name, count]) => {
+        statRows.push([name, count, parseFloat(((count / maxStat) * 100).toFixed(1))]);
+    });
+
+    const ws2 = XLSX.utils.aoa_to_sheet(statRows);
+    ws2['!cols'] = [{ wch: 20 }, { wch: 16 }, { wch: 14 }];
+
+    const r2 = XLSX.utils.decode_range(ws2['!ref']);
+    for (let R2 = 0; R2 <= r2.e.r; R2++) {
+        for (let C2 = 0; C2 <= r2.e.c; C2++) {
+            const addr = XLSX.utils.encode_cell({ r: R2, c: C2 });
+            if (!ws2[addr]) ws2[addr] = { t: 's', v: '' };
+            const isHeader = R2 === 0;
+            const isEven = R2 % 2 === 0;
+            ws2[addr].s = {
+                font: {
+                    name: 'Arial', sz: 9,
+                    bold: isHeader,
+                    color: { rgb: isHeader ? 'FFFFFF' : (C2 === 1 ? '009E94' : '1A1D2E') }
+                },
+                fill: { fgColor: { rgb: isHeader ? '2C3E50' : (isEven ? 'F7F8FC' : 'FFFFFF') } },
+                alignment: { horizontal: C2 === 0 ? 'left' : 'center', vertical: 'center' },
+                border: {
+                    top:    { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } },
+                    bottom: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } },
+                    left:   { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } },
+                    right:  { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }
+                }
+            };
+            // Format percentage column
+            if (!isHeader && C2 === 2) ws2[addr].z = '0.0"%"';
+        }
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws2, 'Thống kê');
+
+    XLSX.writeFile(wb, 'AutoShift_Schedule.xlsx');
 }
 
 window.onload = createEmployeeInputs;
