@@ -1,2 +1,2 @@
-# work-scheduler
-Work Scheduler
+# auto-shift
+Auto Shift
