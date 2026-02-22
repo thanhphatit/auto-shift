@@ -1,94 +1,657 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoShift - Lịch Làm Việc Tự Động</title>
+    <title>AutoShift — Lịch Làm Việc</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #0d6efd; --success: #198754; --danger: #dc3545; --dark: #2c3e50; --warning: #ffc107; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
-        .container { max-width: 1300px; margin: auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: var(--dark); margin-bottom: 5px; }
-        
-        #msgBar { padding: 15px; margin: 20px 0; border-radius: 8px; text-align: center; font-weight: 600; display: none; }
-        .msg-error { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-        .msg-success { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-        .msg-warning { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
+        /* ─── TOKENS ─── */
+        :root[data-theme="dark"] {
+            --bg:         #0b0d11;
+            --surface:    #13161c;
+            --surface2:   #1b1f28;
+            --surface3:   #242834;
+            --border:     #2a2e3e;
+            --border2:    #353b50;
+            --text:       #e8eaf0;
+            --text-dim:   #7a80a0;
+            --text-muted: #454c66;
+            --accent:     #6c63ff;
+            --accent-glow:#6c63ff44;
+            --cyan:       #00d4c8;
+            --amber:      #f4a63a;
+            --red:        #ff5470;
+            --green:      #22d68f;
+            --header-bg:  #0f111a;
+            --chip-bg:    #1e2230;
+            --chip-border:#2e3450;
+            --ot-bg:      #2a1218;
+            --ot-border:  #ff5470;
+            --sel-bg:     #2a2015;
+            --sel-border: #f4a63a;
+            --scrollbar:  #2a2e3e;
+        }
+        :root[data-theme="light"] {
+            --bg:         #f0f2f8;
+            --surface:    #ffffff;
+            --surface2:   #f7f8fc;
+            --surface3:   #eef0f8;
+            --border:     #dde0ef;
+            --border2:    #cccfe0;
+            --text:       #1a1d2e;
+            --text-dim:   #5a6080;
+            --text-muted: #9099bc;
+            --accent:     #5752e8;
+            --accent-glow:#5752e820;
+            --cyan:       #009e94;
+            --amber:      #c47800;
+            --red:        #d92f4a;
+            --green:      #16a567;
+            --header-bg:  #1a1d2e;
+            --chip-bg:    #eef0fb;
+            --chip-border:#d0d4f0;
+            --ot-bg:      #fff0f3;
+            --ot-border:  #d92f4a;
+            --sel-bg:     #fff8e6;
+            --sel-border: #c47800;
+            --scrollbar:  #dde0ef;
+        }
 
-        .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #fafafa; padding: 20px; border-radius: 10px; border: 1px solid #eee; }
-        label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9em; }
-        input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-top: 4px; }
-        
-        .btn-group { text-align: center; margin: 20px 0; }
-        button { cursor: pointer; padding: 12px 25px; border-radius: 6px; border: none; font-weight: bold; transition: 0.3s; margin: 0 5px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        
-        #schedule { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
-        #schedule th, #schedule td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
-        #schedule th { background: var(--dark); color: white; }
-        
-        .emp-chip { display: inline-block; margin: 3px; padding: 5px 10px; border-radius: 5px; background: #eef2f7; border: 1px solid #d1d9e0; cursor: pointer; font-size: 0.85em; }
-        .emp-chip.is-ot { border: 1.5px dashed var(--danger); background: #fff5f5; color: var(--danger); font-weight: 600; }
-        .emp-chip.selected { background: var(--warning) !important; border-color: #ff9800 !important; }
-        
-        #stats { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        #stats th, #stats td { border: 1px solid #eee; padding: 10px; text-align: center; }
+        /* ─── RESET & BASE ─── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.4s, color 0.4s;
+            padding: 0 0 60px;
+        }
+
+        /* ─── SCROLLBAR ─── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+        /* ─── HEADER ─── */
+        .header {
+            background: var(--header-bg);
+            padding: 18px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+        }
+        .logo span {
+            color: var(--accent);
+        }
+        .logo-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            background: var(--cyan);
+            border-radius: 50%;
+            margin-left: 4px;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.6); }
+        }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .header-tag {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* ─── THEME TOGGLE ─── */
+        .theme-toggle {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 4px;
+            display: flex;
+            cursor: pointer;
+            gap: 2px;
+            transition: 0.3s;
+        }
+        .theme-toggle button {
+            padding: 6px 14px;
+            border-radius: 50px;
+            border: none;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.25s;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Manrope', sans-serif;
+        }
+        .theme-toggle button.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* ─── MAIN LAYOUT ─── */
+        .main { max-width: 1340px; margin: 0 auto; padding: 36px 24px; }
+
+        /* ─── SECTION LABEL ─── */
+        .section-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+
+        /* ─── CONFIG PANEL ─── */
+        .config-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 24px;
+            transition: background 0.4s, border 0.4s;
+        }
+        .config-col { display: flex; flex-direction: column; gap: 16px; }
+        .config-block { display: flex; flex-direction: column; gap: 6px; }
+        .config-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            letter-spacing: 0.02em;
+        }
+        .config-label em {
+            font-style: normal;
+            font-family: 'DM Mono', monospace;
+            color: var(--accent);
+            margin-right: 6px;
+            font-size: 0.72rem;
+        }
+
+        /* ─── INPUTS ─── */
+        input[type="text"], input[type="number"] {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.85rem;
+            width: 100%;
+            outline: none;
+            transition: border 0.2s, box-shadow 0.2s, background 0.4s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* ─── EMPLOYEE GRID ─── */
+        .emp-count-row { display: flex; gap: 10px; align-items: center; }
+        .emp-count-row input { width: 80px; }
+        .emp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+
+        /* ─── INLINE ROW INPUTS ─── */
+        .inline-row { display: flex; gap: 12px; }
+        .inline-row > * { flex: 1; }
+
+        /* ─── DAY CHECKBOXES ─── */
+        .days-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .day-chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            transition: 0.2s;
+            user-select: none;
+        }
+        .day-chip input[type="checkbox"] { display: none; }
+        .day-chip.checked {
+            background: var(--accent-glow);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .day-chip:hover { border-color: var(--accent); }
+
+        /* ─── BUTTONS ─── */
+        .btn {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            padding: 11px 22px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            letter-spacing: 0.02em;
+        }
+        .btn-accent {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-accent:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        .btn-outline {
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border2);
+        }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm { padding: 8px 16px; font-size: 0.78rem; }
+
+        .btn-bar {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 28px 0;
+            flex-wrap: wrap;
+        }
+        .btn-generate {
+            background: linear-gradient(135deg, var(--accent) 0%, #9b4dff 100%);
+            color: #fff;
+            font-size: 0.9rem;
+            padding: 14px 32px;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px var(--accent-glow);
+        }
+        .btn-generate:hover { box-shadow: 0 8px 32px var(--accent-glow); transform: translateY(-2px); }
+        .btn-csv {
+            background: var(--surface);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+        }
+        .btn-csv:hover { background: var(--cyan); color: var(--bg); }
+
+        /* ─── MSG BAR ─── */
+        #msgBar {
+            display: none;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        .msg-error   { background: #2a0f13; color: var(--red);   border-color: var(--red); }
+        .msg-success { background: #0c2520; color: var(--green); border-color: var(--green); }
+        .msg-warning { background: #261c08; color: var(--amber); border-color: var(--amber); }
+        [data-theme="light"] .msg-error   { background: #fff0f3; color: #c0162e; border-color: #c0162e; }
+        [data-theme="light"] .msg-success { background: #e6fff5; color: #0f7a52; border-color: #0f7a52; }
+        [data-theme="light"] .msg-warning { background: #fff8e6; color: #8a5200; border-color: #8a5200; }
+
+        /* ─── SCHEDULE TABLE ─── */
+        .table-wrapper {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 28px;
+            transition: background 0.4s, border 0.4s;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            background: var(--surface3);
+            color: var(--text-dim);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        thead th:first-child {
+            color: var(--accent);
+            text-align: left;
+        }
+        tbody tr { transition: background 0.15s; }
+        tbody tr:hover { background: var(--surface2); }
+        tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            text-align: center;
+        }
+        tbody td:first-child {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            text-align: left;
+            white-space: nowrap;
+            border-right: 1px solid var(--border);
+        }
+        tbody tr:last-child td { border-bottom: none; }
+
+        /* ─── EMPLOYEE CHIPS ─── */
+        .emp-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin: 3px;
+            padding: 5px 11px;
+            border-radius: 6px;
+            background: var(--chip-bg);
+            border: 1px solid var(--chip-border);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text);
+            transition: 0.18s;
+            font-family: 'Manrope', sans-serif;
+        }
+        .emp-chip::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            flex-shrink: 0;
+        }
+        .emp-chip:hover { border-color: var(--accent); transform: scale(1.04); }
+        .emp-chip.is-ot {
+            background: var(--ot-bg);
+            border-color: var(--ot-border);
+            color: var(--red);
+        }
+        .emp-chip.is-ot::before { background: var(--red); }
+        .emp-chip.selected {
+            background: var(--sel-bg);
+            border-color: var(--sel-border);
+            color: var(--amber);
+            box-shadow: 0 0 0 2px var(--sel-border);
+        }
+        .emp-chip.selected::before { background: var(--amber); }
+        .empty-slot { color: var(--text-muted); font-size: 0.75rem; font-family: 'DM Mono', monospace; }
+
+        /* ─── STATS TABLE ─── */
+        .stats-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .stats-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stats-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .stats-badge {
+            background: var(--accent-glow);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            padding: 3px 9px;
+            border-radius: 50px;
+        }
+        #stats { width: 100%; border-collapse: collapse; }
+        #stats thead th {
+            background: var(--surface3);
+            color: var(--text-muted);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        #stats tbody td {
+            padding: 11px 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        #stats tbody td:last-child {
+            font-family: 'DM Mono', monospace;
+            color: var(--cyan);
+            font-weight: 500;
+        }
+        .stat-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .stat-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--accent);
+            transition: width 0.6s cubic-bezier(.4,0,.2,1);
+        }
+        #stats tbody tr:last-child td { border-bottom: none; }
+
+        /* ─── DIVIDER ─── */
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 28px 0;
+        }
+
+        /* ─── SCHEDULE SECTION HEADER ─── */
+        .schedule-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .schedule-title {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .swap-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* ─── OT LEGEND ─── */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .legend-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 768px) {
+            .config-panel { grid-template-columns: 1fr; }
+            .header { padding: 14px 20px; }
+            .main { padding: 20px 14px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>AutoShift</h1>
-
-    <div class="config-grid">
-        <div>
-            <label>1. Danh sách nhân viên:</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="number" id="numEmployees" value="8" style="width: 70px;">
-                <button class="btn-primary" onclick="createEmployeeInputs()">Cập nhật</button>
-            </div>
-            <div id="employeeInputs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;"></div>
+<!-- HEADER -->
+<header class="header">
+    <div class="logo">
+        Auto<span>Shift</span><span class="logo-dot"></span>
+    </div>
+    <div class="header-right">
+        <span class="header-tag">Scheduler v2</span>
+        <div class="theme-toggle" id="themeToggle">
+            <button onclick="setTheme('dark')" id="btnDark" class="active">Tối</button>
+            <button onclick="setTheme('light')" id="btnLight">Sáng</button>
         </div>
-        <div>
-            <label>2. Ca làm việc:</label>
-            <input type="text" id="shiftsInput" value="6:00-14:00, 8:00-16:00, 14:00-22:00, 15:30-23:30">
-            <label>3. Số người/ca (Định biên):</label>
-            <input type="text" id="staffPerShiftInput" value="2,2,2,2">
-            <div style="display: flex; gap: 15px;">
-                <div style="flex: 1;"><label>4. Số tuần:</label><input type="number" id="numWeeks" value="1"></div>
-                <div style="flex: 1;"><label>5. Giới hạn OT/ngày:</label><input type="number" id="maxOTPerDay" value="1"></div>
+    </div>
+</header>
+
+<div class="main">
+
+    <!-- CONFIG PANEL -->
+    <p class="section-label">▸ Cấu hình lịch</p>
+    <div class="config-panel">
+        <!-- COL 1 -->
+        <div class="config-col">
+            <div class="config-block">
+                <label class="config-label"><em>01</em>Danh sách nhân viên</label>
+                <div class="emp-count-row">
+                    <input type="number" id="numEmployees" value="8" min="1">
+                    <button class="btn btn-accent btn-sm" onclick="createEmployeeInputs()">Cập nhật</button>
+                </div>
+                <div class="emp-grid" id="employeeInputs"></div>
             </div>
-            <label>6. Ngày làm việc:</label>
-            <div id="dayCheckboxes" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <label><input type="checkbox" checked value="T2"> T2</label>
-                <label><input type="checkbox" checked value="T3"> T3</label>
-                <label><input type="checkbox" checked value="T4"> T4</label>
-                <label><input type="checkbox" checked value="T5"> T5</label>
-                <label><input type="checkbox" checked value="T6"> T6</label>
-                <label><input type="checkbox" checked value="T7"> T7</label>
-                <label><input type="checkbox" checked value="CN"> CN</label>
+            <div class="config-block">
+                <label class="config-label"><em>04</em>Số tuần lịch</label>
+                <input type="number" id="numWeeks" value="1" min="1">
+            </div>
+        </div>
+        <!-- COL 2 -->
+        <div class="config-col">
+            <div class="config-block">
+                <label class="config-label"><em>02</em>Ca làm việc (phân cách bằng dấu phẩy)</label>
+                <input type="text" id="shiftsInput" value="6:00-14:00, 8:00-16:00, 14:00-22:00, 15:30-23:30">
+            </div>
+            <div class="config-block">
+                <label class="config-label"><em>03</em>Số người / ca (Định biên)</label>
+                <input type="text" id="staffPerShiftInput" value="2,2,2,2">
+            </div>
+            <div class="config-block">
+                <label class="config-label"><em>05</em>Giới hạn OT / ngày</label>
+                <input type="number" id="maxOTPerDay" value="1" min="0">
+            </div>
+            <div class="config-block">
+                <label class="config-label"><em>06</em>Ngày làm việc</label>
+                <div class="days-row" id="dayCheckboxes">
+                    <label class="day-chip checked"><input type="checkbox" checked value="T2">T2</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="T3">T3</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="T4">T4</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="T5">T5</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="T6">T6</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="T7">T7</label>
+                    <label class="day-chip checked"><input type="checkbox" checked value="CN">CN</label>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- MSG BAR -->
     <div id="msgBar"></div>
 
-    <div class="btn-group">
-        <button class="btn-primary" onclick="generateSchedule()">XUẤT LỊCH NGẪU NHIÊN & XOAY VÒNG</button>
-        <button class="btn-success" onclick="downloadCSV()">TẢI FILE CSV</button>
+    <!-- ACTION BUTTONS -->
+    <div class="btn-bar">
+        <button class="btn btn-generate" onclick="generateSchedule()">⚡ Xuất lịch ngẫu nhiên & xoay vòng</button>
+        <button class="btn btn-csv" onclick="downloadCSV()">↓ Tải file CSV</button>
     </div>
 
-    <table id="schedule"></table>
-    <h3>📊 Thống kê tổng ca</h3>
-    <table id="stats"></table>
+    <!-- SCHEDULE TABLE -->
+    <div id="scheduleSection" style="display:none">
+        <div class="schedule-header">
+            <span class="schedule-title">📅 Lịch làm việc</span>
+            <span class="swap-hint">↔ Click hai nhân viên để hoán đổi ca</span>
+        </div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--green)"></div>
+                Ca chính
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--red)"></div>
+                Tăng ca (OT)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--amber)"></div>
+                Đang chọn để hoán đổi
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table id="schedule"></table>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- STATS -->
+        <div class="stats-panel">
+            <div class="stats-header">
+                <span class="stats-title">📊 Thống kê tổng ca</span>
+                <span class="stats-badge" id="statsBadge">0 nhân viên</span>
+            </div>
+            <table id="stats">
+                <thead>
+                    <tr>
+                        <th>Nhân viên</th>
+                        <th>Tổng ca</th>
+                        <th style="width: 40%">Phân bổ</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 <script>
 let employeeNodes = [];
-let scheduleData = []; 
+let scheduleData = [];
 let selectedForSwap = null;
 
+/* ─── THEME ─── */
+function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('btnDark').classList.toggle('active', t === 'dark');
+    document.getElementById('btnLight').classList.toggle('active', t === 'light');
+    localStorage.setItem('autoshift-theme', t);
+}
+(function() {
+    const saved = localStorage.getItem('autoshift-theme') || 'dark';
+    setTheme(saved);
+})();
+
+/* ─── DAY CHIPS ─── */
+document.getElementById('dayCheckboxes').addEventListener('change', function(e) {
+    const chip = e.target.closest('.day-chip');
+    if (chip) chip.classList.toggle('checked', e.target.checked);
+});
+
+/* ─── MSG ─── */
 function showMsg(text, type) {
     const bar = document.getElementById('msgBar');
     bar.innerText = text;
@@ -96,28 +659,34 @@ function showMsg(text, type) {
     bar.style.display = 'block';
 }
 
+/* ─── EMPLOYEE INPUTS ─── */
 function createEmployeeInputs() {
-    const num = document.getElementById('numEmployees').value;
+    const num = parseInt(document.getElementById('numEmployees').value);
     const container = document.getElementById('employeeInputs');
-    container.innerHTML = ''; employeeNodes = [];
+    container.innerHTML = '';
+    employeeNodes = [];
     for (let i = 0; i < num; i++) {
-        const input = document.createElement('input');
-        input.type = 'text'; input.value = `NV ${i+1}`;
-        container.appendChild(input);
-        employeeNodes.push(input);
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = `NV ${i + 1}`;
+        inp.placeholder = `Nhân viên ${i + 1}`;
+        container.appendChild(inp);
+        employeeNodes.push(inp);
     }
 }
 
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
+/* ─── SHUFFLE ─── */
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    return array;
+    return arr;
 }
 
+/* ─── GENERATE ─── */
 function generateSchedule() {
-    const names = employeeNodes.map(i => i.value.trim()).filter(n => n !== "");
+    const names = employeeNodes.map(i => i.value.trim()).filter(n => n !== '');
     const shifts = document.getElementById('shiftsInput').value.split(',').map(s => s.trim());
     const staffCounts = document.getElementById('staffPerShiftInput').value.split(',').map(s => parseInt(s.trim()));
     const weeks = parseInt(document.getElementById('numWeeks').value);
@@ -128,12 +697,16 @@ function generateSchedule() {
     let actualMaxOT = (names.length < totalSlotsPerDay) ? maxDayOT : 0;
 
     if (names.length < totalSlotsPerDay && maxDayOT <= 0) {
-        showMsg(`❌ Lỗi: Thiếu nhân sự nhưng giới hạn OT = 0.`, "error");
+        showMsg('❌ Lỗi: Thiếu nhân sự nhưng giới hạn OT = 0.', 'error');
         return;
     }
-    showMsg(actualMaxOT > 0 ? "ℹ️ Chế độ: Tăng ca xoay vòng (Thiếu nhân sự)." : "✅ Chế độ: Nhân sự đầy đủ (Không OT).", actualMaxOT > 0 ? "warning" : "success");
+    showMsg(
+        actualMaxOT > 0 ? 'ℹ️ Chế độ: Tăng ca xoay vòng — Thiếu nhân sự, đã bật OT.' : '✅ Chế độ: Nhân sự đầy đủ — Không cần OT.',
+        actualMaxOT > 0 ? 'warning' : 'success'
+    );
 
-    let workStats = {}; names.forEach(n => workStats[n] = 0);
+    let workStats = {};
+    names.forEach(n => workStats[n] = 0);
     scheduleData = [];
     let dayCount = 0;
 
@@ -141,35 +714,27 @@ function generateSchedule() {
         days.forEach(d => {
             dayCount++;
             let dayData = { day: weeks > 1 ? `${d} (W${w})` : d, shifts: {} };
-            let assignedToday = new Set(); 
+            let assignedToday = new Set();
             let dayOTCount = 0;
-
-            // QUAN TRỌNG: Đảo thứ tự xét ca theo ngày để xoay vòng OT trưa/tối
-            // Ngày lẻ: Ưu tiên ca 14:00 (index 2) | Ngày chẵn: Ưu tiên ca 15:30 (index 3)
             let shiftOrder = (dayCount % 2 !== 0) ? [0, 1, 2, 3] : [1, 0, 3, 2];
-            
-            // Khởi tạo các ca trống
             shifts.forEach(s => dayData.shifts[s] = []);
 
             shiftOrder.forEach(idx => {
+                if (idx >= shifts.length) return;
                 const shiftName = shifts[idx];
                 const needed = staffCounts[idx] || 0;
                 let selected = dayData.shifts[shiftName];
 
-                // 1. Xét OT nối ca (Chỉ khi thiếu người)
                 if (actualMaxOT > 0 && idx >= 2) {
                     let potentialOT = [];
-                    // Kiểm tra ca sáng tương ứng đã xếp chưa
-                    let morningShiftName = shifts[idx-2];
+                    let morningShiftName = shifts[idx - 2];
                     if (dayData.shifts[morningShiftName]) {
                         dayData.shifts[morningShiftName].forEach(emp => {
                             if (!emp.isOT) potentialOT.push(emp.name);
                         });
                     }
-                    
                     shuffle(potentialOT);
                     potentialOT.sort((a, b) => workStats[a] - workStats[b]);
-
                     while (selected.length < needed && potentialOT.length > 0 && dayOTCount < actualMaxOT) {
                         let name = potentialOT.shift();
                         selected.push({ name, isOT: true });
@@ -178,11 +743,9 @@ function generateSchedule() {
                     }
                 }
 
-                // 2. Điền ca chính (Người chưa có ca hôm nay)
                 let available = names.filter(n => !assignedToday.has(n) && !selected.find(s => s.name === n));
                 shuffle(available);
                 available.sort((a, b) => workStats[a] - workStats[b]);
-
                 while (selected.length < needed && available.length > 0) {
                     let name = available.shift();
                     selected.push({ name, isOT: false });
@@ -190,7 +753,6 @@ function generateSchedule() {
                     workStats[name]++;
                 }
 
-                // 3. Vét OT nếu vẫn thiếu
                 if (selected.length < needed && actualMaxOT > 0) {
                     let others = names.filter(n => !selected.find(s => s.name === n));
                     shuffle(others);
@@ -204,7 +766,7 @@ function generateSchedule() {
                 }
 
                 while (selected.length < needed) {
-                    selected.push({ name: "[Trống]", isOT: false, isEmpty: true });
+                    selected.push({ name: '[Trống]', isOT: false, isEmpty: true });
                 }
             });
             scheduleData.push(dayData);
@@ -213,28 +775,46 @@ function generateSchedule() {
     renderAll();
 }
 
+/* ─── RENDER ─── */
 function renderAll() {
+    document.getElementById('scheduleSection').style.display = 'block';
     const table = document.getElementById('schedule');
     table.innerHTML = '';
     if (!scheduleData.length) return;
-    const header = table.insertRow();
-    header.insertCell().innerHTML = "<b>Ngày</b>";
+
     const shifts = Object.keys(scheduleData[0].shifts);
-    shifts.forEach(s => header.insertCell().innerHTML = `<b>${s}</b>`);
-    
+
+    const thead = table.createTHead();
+    const hr = thead.insertRow();
+    const thDay = document.createElement('th');
+    thDay.innerText = 'Ngày';
+    hr.appendChild(thDay);
+    shifts.forEach(s => {
+        const th = document.createElement('th');
+        th.innerText = s;
+        hr.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
     scheduleData.forEach((d, dIdx) => {
-        const row = table.insertRow();
-        row.insertCell().innerText = d.day;
+        const row = tbody.insertRow();
+        const tdDay = row.insertCell();
+        tdDay.innerText = d.day;
         shifts.forEach(sKey => {
             const cell = row.insertCell();
             d.shifts[sKey].forEach((empObj, eIdx) => {
-                const span = document.createElement('span');
-                span.className = empObj.isEmpty ? '' : 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
-                span.style.color = empObj.isEmpty ? '#ccc' : '';
-                span.innerText = empObj.name;
-                if (!empObj.isEmpty) span.onclick = (e) => handleSwap(dIdx, sKey, eIdx, e.target);
-                cell.appendChild(span);
-                cell.appendChild(document.createElement('br'));
+                if (empObj.isEmpty) {
+                    const s = document.createElement('span');
+                    s.className = 'empty-slot';
+                    s.innerText = '—';
+                    cell.appendChild(s);
+                } else {
+                    const chip = document.createElement('span');
+                    chip.className = 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
+                    chip.innerText = empObj.name;
+                    chip.onclick = (e) => handleSwap(dIdx, sKey, eIdx, e.currentTarget);
+                    cell.appendChild(chip);
+                }
             });
         });
     });
@@ -258,34 +838,50 @@ function handleSwap(dIdx, sKey, eIdx, target) {
 
 function updateStats() {
     const stats = {};
-    employeeNodes.forEach(i => { if(i.value.trim()) stats[i.value.trim()] = 0; });
+    employeeNodes.forEach(i => { if (i.value.trim()) stats[i.value.trim()] = 0; });
     scheduleData.forEach(d => {
         Object.values(d.shifts).forEach(list => {
-            list.forEach(e => { if(!e.isEmpty && stats[e.name] !== undefined) stats[e.name]++; });
+            list.forEach(e => { if (!e.isEmpty && stats[e.name] !== undefined) stats[e.name]++; });
         });
     });
-    const table = document.getElementById('stats');
-    table.innerHTML = `<tr><th>Nhân viên</th><th>Tổng ca làm</th></tr>`;
-    Object.entries(stats).sort((a,b) => a[1]-b[1]).forEach(([n, c]) => {
-        const row = table.insertRow();
-        row.insertCell().innerText = n;
-        row.insertCell().innerText = c + " ca";
+
+    const entries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    const maxVal = entries.length ? entries[0][1] : 1;
+
+    document.getElementById('statsBadge').innerText = `${entries.length} nhân viên`;
+
+    const tbody = document.querySelector('#stats tbody');
+    tbody.innerHTML = '';
+    entries.forEach(([name, count]) => {
+        const row = tbody.insertRow();
+        row.insertCell().innerText = name;
+        row.insertCell().innerText = count + ' ca';
+        const barCell = row.insertCell();
+        const pct = maxVal > 0 ? (count / maxVal * 100).toFixed(1) : 0;
+        barCell.innerHTML = `
+            <div class="stat-bar-wrap">
+                <div class="stat-bar" style="width:${pct}%"></div>
+                <span style="font-size:0.72rem; color:var(--text-muted); font-family:'DM Mono',monospace">${pct}%</span>
+            </div>`;
     });
 }
 
+/* ─── CSV ─── */
 function downloadCSV() {
-    let csv = "\uFEFFNgày," + Object.keys(scheduleData[0].shifts).join(",") + "\n";
+    if (!scheduleData.length) return;
+    let csv = '\uFEFFNgày,' + Object.keys(scheduleData[0].shifts).join(',') + '\n';
     scheduleData.forEach(d => {
         let line = [d.day];
-        Object.values(d.shifts).forEach(emps => line.push(emps.map(e => e.name).join(" - ")));
-        csv += line.join(",") + "\n";
+        Object.values(d.shifts).forEach(emps => line.push(emps.map(e => e.name).join(' - ')));
+        csv += line.join(',') + '\n';
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = "Lich_Xoay_Vong_OT.csv";
+    a.download = 'AutoShift_Lich.csv';
     a.click();
 }
+
 window.onload = createEmployeeInputs;
 </script>
 </body>
