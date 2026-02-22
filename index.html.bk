@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoShift - Swap & Smart OT</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
+    .container { max-width: 1400px; margin: auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #333; }
+    .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    label { display: block; margin-top: 10px; font-weight: 600; }
+    input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+    .btn-group { text-align: center; margin-bottom: 20px; }
+    button { cursor: pointer; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; transition: 0.3s; margin: 5px; }
+    .btn-primary { background: #0d6efd; color: white; }
+    .btn-success { background: #198754; color: white; }
+    #schedule { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    #schedule th, #schedule td { border: 1px solid #dee2e6; padding: 12px; text-align: center; }
+    #schedule th { background: #0d6efd; color: white; }
+    .emp-chip { 
+        display: inline-block; margin: 3px; padding: 5px 10px; border-radius: 20px; 
+        background: #e7f1ff; color: #0d6efd; border: 1px solid #0d6efd; 
+        cursor: pointer; font-size: 13px; font-weight: 500; user-select: none;
+    }
+    .emp-chip.selected { background: #ffc107; border-color: #ff9800; color: #000; box-shadow: 0 0 10px #ffc107; }
+    .emp-chip.is-ot { border-style: dashed; background: #fff3cd; color: #856404; }
+    #stats { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    #stats th, #stats td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .instructions { font-size: 13px; color: #666; font-style: italic; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>AutoShift - Hệ Thống Hoán Đổi & OT Thông Minh</h1>
+    <p class="instructions">* Click vào 1 nhân viên, sau đó click vào nhân viên khác để hoán đổi vị trí cho nhau.</p>
+
+    <div class="config-grid">
+        <div>
+            <label>Danh sách nhân viên:</label>
+            <input type="number" id="numEmployees" value="8" style="width: 80px; margin-bottom: 10px;">
+            <button class="btn-primary" onclick="createEmployeeInputs()" style="padding: 5px 10px;">Tạo ô nhập</button>
+            <div id="employeeInputs"></div>
+        </div>
+        <div>
+            <label>Ca làm việc (giờ bắt đầu - giờ kết thúc):</label>
+            <input type="text" id="shiftsInput" value="6:00-14:00, 8:00-16:00, 14:00-22:00, 15:30-23:30">
+            <label>Số người mỗi ca:</label>
+            <input type="text" id="staffPerShiftInput" value="2,2,2,2">
+            <label>Số tuần & Max OT/ca:</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="numWeeks" value="1" title="Số tuần">
+                <input type="number" id="maxOT" value="1" title="Số người tối đa được OT mỗi ca">
+            </div>
+            <label>Ngày làm việc:</label>
+            <div id="dayCheckboxes">
+                <input type="checkbox" checked value="T2"> T2 <input type="checkbox" checked value="T3"> T3 
+                <input type="checkbox" checked value="T4"> T4 <input type="checkbox" checked value="T5"> T5 
+                <input type="checkbox" checked value="T6"> T6 <input type="checkbox" checked value="T7"> T7 
+                <input type="checkbox" checked value="CN"> CN
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-primary" onclick="generateSchedule()">XUẤT LỊCH MỚI (RANDOM)</button>
+        <button class="btn-success" onclick="downloadCSV()">TẢI CSV</button>
+    </div>
+
+    <table id="schedule"></table>
+
+    <h3>Thống kê tổng ca</h3>
+    <table id="stats"></table>
+</div>
+
+<script>
+let employeeNodes = [];
+let scheduleData = []; 
+let selectedForSwap = null;
+
+function createEmployeeInputs() {
+    const num = document.getElementById('numEmployees').value;
+    const container = document.getElementById('employeeInputs');
+    container.innerHTML = ''; employeeNodes = [];
+    for (let i = 0; i < num; i++) {
+        const input = document.createElement('input');
+        input.type = 'text'; input.value = `NV ${i+1}`;
+        input.style.width = "120px"; input.style.margin = "2px";
+        container.appendChild(input);
+        employeeNodes.push(input);
+    }
+}
+
+function timeToMin(t){ 
+    const parts = t.trim().split(':');
+    return parseInt(parts[0])*60 + (parts[1] ? parseInt(parts[1]) : 0); 
+}
+
+// Kiểm tra nối ca thông minh (kết thúc ca này cách bắt đầu ca kia <= 30 phút)
+function canConnect(shift1, shift2) {
+    const end1 = timeToMin(shift1.split('-')[1]);
+    const start2 = timeToMin(shift2.split('-')[0]);
+    return (start2 >= end1) && (start2 - end1 <= 40); // Cho phép lệch tối đa 40p để bao quát 8h-16h nối 15h30
+}
+
+function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+function generateSchedule() {
+    const names = employeeNodes.map(i => i.value.trim());
+    const shifts = document.getElementById('shiftsInput').value.split(',').map(s => s.trim());
+    const staffCounts = document.getElementById('staffPerShiftInput').value.split(',').map(s => parseInt(s.trim()));
+    const weeks = parseInt(document.getElementById('numWeeks').value);
+    const maxOT = parseInt(document.getElementById('maxOT').value);
+    const days = Array.from(document.querySelectorAll('#dayCheckboxes input:checked')).map(i => i.value);
+
+    let workStats = {}; names.forEach(n => workStats[n] = 0);
+    scheduleData = [];
+
+    for (let w = 1; w <= weeks; w++) {
+        days.forEach(d => {
+            let dayKey = weeks > 1 ? `${d} (W${w})` : d;
+            let dayData = { day: dayKey, shifts: {} };
+            let assignedToday = {}; // {name: shiftIndex}
+
+            shifts.forEach((shift, sIdx) => {
+                let needed = staffCounts[sIdx] || 1;
+                let selected = [];
+                let otCount = 0;
+
+                // 1. Logic OT: Tìm người từ các ca trước có thể nối tiếp
+                for (let name in assignedToday) {
+                    if (selected.length < needed && otCount < maxOT) {
+                        let prevShiftIdx = assignedToday[name];
+                        if (canConnect(shifts[prevShiftIdx], shift)) {
+                            selected.push({ name, isOT: true });
+                            otCount++;
+                            workStats[name]++;
+                        }
+                    }
+                }
+
+                // 2. Logic Chia Đều: Ưu tiên người chưa làm hôm nay và làm ít ca nhất
+                let available = names.filter(n => !assignedToday[n] && !selected.find(s => s.name === n));
+                shuffle(available);
+                available.sort((a, b) => workStats[a] - workStats[b]);
+
+                while (selected.length < needed && available.length > 0) {
+                    let name = available.shift();
+                    selected.push({ name, isOT: false });
+                    assignedToday[name] = sIdx;
+                    workStats[name]++;
+                }
+
+                // 3. Nếu vẫn thiếu: Lấy người bất kỳ ít ca nhất
+                if (selected.length < needed) {
+                    let others = names.filter(n => !selected.find(s => s.name === n));
+                    others.sort((a, b) => workStats[a] - workStats[b]);
+                    while (selected.length < needed && others.length > 0) {
+                        let name = others.shift();
+                        selected.push({ name, isOT: true });
+                        workStats[name]++;
+                    }
+                }
+                dayData.shifts[shift] = selected;
+                selected.forEach(s => assignedToday[s.name] = sIdx);
+            });
+            scheduleData.push(dayData);
+        });
+    }
+    renderAll();
+}
+
+function renderAll() {
+    renderTable();
+    updateStats();
+}
+
+function renderTable() {
+    const table = document.getElementById('schedule');
+    table.innerHTML = '';
+    if (!scheduleData.length) return;
+
+    const header = table.insertRow();
+    header.insertCell().innerHTML = "<b>Ngày</b>";
+    Object.keys(scheduleData[0].shifts).forEach(s => header.insertCell().innerHTML = `<b>${s}</b>`);
+
+    scheduleData.forEach((d, dIdx) => {
+        const row = table.insertRow();
+        row.insertCell().innerText = d.day;
+        Object.keys(d.shifts).forEach(sKey => {
+            const cell = row.insertCell();
+            d.shifts[sKey].forEach((empObj, eIdx) => {
+                const span = document.createElement('span');
+                span.className = 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
+                span.innerText = empObj.name;
+                // Xử lý hoán đổi
+                span.onclick = () => handleSwap(dIdx, sKey, eIdx);
+                cell.appendChild(span);
+            });
+        });
+    });
+}
+
+function handleSwap(dIdx, sKey, eIdx) {
+    const current = { dIdx, sKey, eIdx };
+    const chip = event.target;
+
+    if (!selectedForSwap) {
+        selectedForSwap = { ...current, chip };
+        chip.classList.add('selected');
+    } else {
+        // Thực hiện đổi trong dữ liệu
+        const first = selectedForSwap;
+        const second = current;
+
+        const temp = scheduleData[first.dIdx].shifts[first.sKey][first.eIdx];
+        scheduleData[first.dIdx].shifts[first.sKey][first.eIdx] = scheduleData[second.dIdx].shifts[second.sKey][second.eIdx];
+        scheduleData[second.dIdx].shifts[second.sKey][second.eIdx] = temp;
+
+        selectedForSwap.chip.classList.remove('selected');
+        selectedForSwap = null;
+        renderAll(); // Vẽ lại để cập nhật màu OT và thống kê
+    }
+}
+
+function updateStats() {
+    const stats = {};
+    employeeNodes.forEach(i => stats[i.value.trim()] = 0);
+    scheduleData.forEach(d => {
+        Object.values(d.shifts).forEach(list => {
+            list.forEach(e => { if(stats[e.name] !== undefined) stats[e.name]++; });
+        });
+    });
+
+    const table = document.getElementById('stats');
+    table.innerHTML = `<tr><th>Nhân viên</th><th>Tổng ca</th></tr>`;
+    Object.entries(stats).forEach(([n, c]) => {
+        const row = table.insertRow();
+        row.insertCell().innerText = n;
+        row.insertCell().innerText = c;
+    });
+}
+
+function downloadCSV() {
+    let csv = "\uFEFFNgày," + Object.keys(scheduleData[0].shifts).join(",") + "\n";
+    scheduleData.forEach(d => {
+        let line = [d.day];
+        Object.values(d.shifts).forEach(emps => line.push(emps.map(e => e.name).join(" - ")));
+        csv += line.join(",") + "\n";
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "Lich_Lam_Viec.csv";
+    a.click();
+}
+
+window.onload = createEmployeeInputs;
+</script>
+</body>
+</html>
