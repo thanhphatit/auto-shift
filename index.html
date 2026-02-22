@@ -555,7 +555,7 @@
         Auto<span>Shift</span><span class="logo-dot"></span>
     </div>
     <div class="header-right">
-        <span class="header-tag">Mode</span>
+        <span class="header-tag">MODE</span>
         <div class="theme-toggle" id="themeToggle">
             <button onclick="setTheme('dark')" id="btnDark" class="active">Tối</button>
             <button onclick="setTheme('light')" id="btnLight">Sáng</button>
@@ -643,6 +643,9 @@
             <div class="legend-item">
                 <div class="legend-dot" style="background: var(--amber)"></div>
                 Đang chọn để hoán đổi
+            </div>
+            <div class="legend-item" style="margin-left: auto; font-size:0.7rem; color:var(--text-muted); font-family:'DM Mono',monospace">
+                ⚠ Ca tối muộn nhất → không xếp ca sáng sớm hôm sau
             </div>
         </div>
         <div class="table-wrapper">
@@ -754,6 +757,39 @@ function generateSchedule() {
     scheduleData = [];
     let dayCount = 0;
 
+    // Track ai làm ca tối muộn nhất hôm trước (để block ca sáng sớm hôm sau)
+    // Key: tên ca kết thúc muộn nhất, Value: Set tên nhân viên
+    let nightWorkersPrevDay = new Set(); // ai làm ca 15:30-23:30 hôm trước
+
+    // Hàm phát hiện ca tối muộn nhất và ca sáng sớm nhất từ danh sách ca
+    function getLatestNightShift(shiftList) {
+        // Ca kết thúc muộn nhất = end time lớn nhất, ưu tiên > 20:00
+        let latest = null, latestEnd = -1;
+        shiftList.forEach(s => {
+            const parts = s.split('-');
+            if (parts.length < 2) return;
+            const [eh, em] = parts[1].split(':').map(Number);
+            const endMin = eh * 60 + em;
+            if (endMin > latestEnd) { latestEnd = endMin; latest = s; }
+        });
+        return latest;
+    }
+    function getEarliestMorningShift(shiftList) {
+        // Ca bắt đầu sớm nhất = start time nhỏ nhất
+        let earliest = null, earliestStart = Infinity;
+        shiftList.forEach(s => {
+            const parts = s.split('-');
+            if (parts.length < 2) return;
+            const [sh, sm] = parts[0].split(':').map(Number);
+            const startMin = sh * 60 + sm;
+            if (startMin < earliestStart) { earliestStart = startMin; earliest = s; }
+        });
+        return earliest;
+    }
+
+    const latestNightShiftName  = getLatestNightShift(shifts);
+    const earliestMorningShiftName = getEarliestMorningShift(shifts);
+
     for (let w = 1; w <= weeks; w++) {
         days.forEach(d => {
             dayCount++;
@@ -763,11 +799,17 @@ function generateSchedule() {
             let shiftOrder = (dayCount % 2 !== 0) ? [0, 1, 2, 3] : [1, 0, 3, 2];
             shifts.forEach(s => dayData.shifts[s] = []);
 
+            // nightWorkersPrevDay = những người KHÔNG được xếp vào ca sáng sớm hôm nay
+            const blockedForMorning = new Set(nightWorkersPrevDay);
+
             shiftOrder.forEach(idx => {
                 if (idx >= shifts.length) return;
                 const shiftName = shifts[idx];
                 const needed = staffCounts[idx] || 0;
                 let selected = dayData.shifts[shiftName];
+
+                // Xác định có phải ca sáng sớm nhất không → áp dụng rule block
+                const isMorningShift = (shiftName === earliestMorningShiftName);
 
                 if (actualMaxOT > 0 && idx >= 2) {
                     let potentialOT = [];
@@ -787,7 +829,12 @@ function generateSchedule() {
                     }
                 }
 
-                let available = names.filter(n => !assignedToday.has(n) && !selected.find(s => s.name === n));
+                // Lọc available: nếu là ca sáng sớm → loại người làm ca tối hôm trước
+                let available = names.filter(n =>
+                    !assignedToday.has(n) &&
+                    !selected.find(s => s.name === n) &&
+                    !(isMorningShift && blockedForMorning.has(n))
+                );
                 shuffle(available);
                 available.sort((a, b) => workStats[a] - workStats[b]);
                 while (selected.length < needed && available.length > 0) {
@@ -798,7 +845,11 @@ function generateSchedule() {
                 }
 
                 if (selected.length < needed && actualMaxOT > 0) {
-                    let others = names.filter(n => !selected.find(s => s.name === n));
+                    // OT fallback: vẫn áp dụng rule block cho ca sáng sớm
+                    let others = names.filter(n =>
+                        !selected.find(s => s.name === n) &&
+                        !(isMorningShift && blockedForMorning.has(n))
+                    );
                     shuffle(others);
                     others.sort((a, b) => workStats[a] - workStats[b]);
                     while (selected.length < needed && others.length > 0 && dayOTCount < actualMaxOT) {
@@ -813,6 +864,15 @@ function generateSchedule() {
                     selected.push({ name: '[Trống]', isOT: false, isEmpty: true });
                 }
             });
+
+            // Cập nhật nightWorkersPrevDay cho ngày tiếp theo
+            nightWorkersPrevDay = new Set();
+            if (latestNightShiftName && dayData.shifts[latestNightShiftName]) {
+                dayData.shifts[latestNightShiftName].forEach(emp => {
+                    if (!emp.isEmpty) nightWorkersPrevDay.add(emp.name);
+                });
+            }
+
             scheduleData.push(dayData);
         });
     }
