@@ -515,7 +515,7 @@
 <header class="header">
     <div class="logo">Auto<span>Shift</span><span class="logo-dot"></span></div>
     <div class="header-right">
-        <span class="header-tag">Scheduler v2.3 - MODE</span>
+        <span class="header-tag">Scheduler v2.3</span>
         <div class="theme-toggle" id="themeToggle">
             <button onclick="setTheme('dark')" id="btnDark" class="active">Tối</button>
             <button onclick="setTheme('light')" id="btnLight">Sáng</button>
@@ -1088,7 +1088,7 @@ function downloadCSV() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'AutoShift_Calendar.csv';
+    a.download = 'AutoShift_Lich.csv';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
@@ -1172,7 +1172,7 @@ function downloadXLSX() {
         }
     }
     XLSX.utils.book_append_sheet(wb, ws2, 'Thống kê');
-    XLSX.writeFile(wb, 'AutoShift_Calendar.xlsx');
+    XLSX.writeFile(wb, 'AutoShift_Lich.xlsx');
 }
 
 window.onload = createEmployeeInputs;

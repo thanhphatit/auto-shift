@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoShift Pro - Xoay Vòng OT Thông Minh</title>
+    <style>
+        :root {
+            --primary: #0d6efd;
+            --success: #198754;
+            --danger: #dc3545;
+            --dark: #2c3e50;
+            --warning: #ffc107;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f7f6;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+
+        #msgBar {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .msg-error {
+            background: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
+
+        .msg-success {
+            background: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+
+        .msg-warning {
+            background: #fff3cd;
+            color: #664d03;
+            border: 1px solid #ffecb5;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #eee;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        input {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 4px;
+        }
+
+        .btn-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 12px 25px;
+            border-radius: 6px;
+            border: none;
+            font-weight: bold;
+            transition: 0.3s;
+            margin: 0 5px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        #schedule {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: white;
+        }
+
+        #schedule th,
+        #schedule td {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            text-align: center;
+        }
+
+        #schedule th {
+            background: var(--dark);
+            color: white;
+        }
+
+        .emp-chip {
+            display: inline-block;
+            margin: 3px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background: #eef2f7;
+            border: 1px solid #d1d9e0;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .emp-chip.is-ot {
+            border: 1.5px dashed var(--danger);
+            background: #fff5f5;
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .emp-chip.selected {
+            background: var(--warning) !important;
+            border-color: #ff9800 !important;
+        }
+
+        #stats {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        #stats th,
+        #stats td {
+            border: 1px solid #eee;
+            padding: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>AutoShift - Xoay Vòng Ca OT</h1>
+
+        <div class="config-grid">
+            <div>
+                <label>1. Danh sách nhân viên:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="numEmployees" value="7" style="width: 70px;">
+                    <button class="btn-primary" onclick="createEmployeeInputs()">Cập nhật</button>
+                </div>
+                <div id="employeeInputs"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;"></div>
+            </div>
+            <div>
+                <label>2. Ca làm việc:</label>
+                <input type="text" id="shiftsInput" value="6:00-14:00, 8:00-16:00, 14:00-22:00, 15:30-23:30">
+                <label>3. Số người/ca (Định biên):</label>
+                <input type="text" id="staffPerShiftInput" value="2,2,2,2">
+                <div style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>4. Số tuần:</label><input type="number" id="numWeeks" value="1"></div>
+                    <div style="flex: 1;"><label>5. Giới hạn OT/ngày:</label><input type="number" id="maxOTPerDay"
+                            value="1"></div>
+                </div>
+                <label>6. Ngày làm việc:</label>
+                <div id="dayCheckboxes" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <label><input type="checkbox" checked value="T2"> T2</label>
+                    <label><input type="checkbox" checked value="T3"> T3</label>
+                    <label><input type="checkbox" checked value="T4"> T4</label>
+                    <label><input type="checkbox" checked value="T5"> T5</label>
+                    <label><input type="checkbox" checked value="T6"> T6</label>
+                    <label><input type="checkbox" checked value="T7"> T7</label>
+                    <label><input type="checkbox" checked value="CN"> CN</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="msgBar"></div>
+
+        <div class="btn-group">
+            <button class="btn-primary" onclick="generateSchedule()">XUẤT LỊCH NGẪU NHIÊN & XOAY VÒNG</button>
+            <button class="btn-success" onclick="downloadCSV()">TẢI FILE CSV</button>
+        </div>
+
+        <table id="schedule"></table>
+        <h3>📊 Thống kê tổng ca</h3>
+        <table id="stats"></table>
+    </div>
+
+    <script>
+        let employeeNodes = [];
+        let scheduleData = [];
+        let selectedForSwap = null;
+
+        function showMsg(text, type) {
+            const bar = document.getElementById('msgBar');
+            bar.innerText = text;
+            bar.className = 'msg-' + type;
+            bar.style.display = 'block';
+        }
+
+        function createEmployeeInputs() {
+            const num = document.getElementById('numEmployees').value;
+            const container = document.getElementById('employeeInputs');
+            container.innerHTML = ''; employeeNodes = [];
+            for (let i = 0; i < num; i++) {
+                const input = document.createElement('input');
+                input.type = 'text'; input.value = `NV ${i + 1}`;
+                container.appendChild(input);
+                employeeNodes.push(input);
+            }
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function generateSchedule() {
+            const names = employeeNodes.map(i => i.value.trim()).filter(n => n !== "");
+            const shifts = document.getElementById('shiftsInput').value.split(',').map(s => s.trim());
+            const staffCounts = document.getElementById('staffPerShiftInput').value.split(',').map(s => parseInt(s.trim()));
+            const weeks = parseInt(document.getElementById('numWeeks').value);
+            const maxDayOT = parseInt(document.getElementById('maxOTPerDay').value);
+            const days = Array.from(document.querySelectorAll('#dayCheckboxes input:checked')).map(i => i.value);
+
+            const totalSlotsPerDay = staffCounts.reduce((a, b) => a + b, 0);
+            let actualMaxOT = (names.length < totalSlotsPerDay) ? maxDayOT : 0;
+
+            if (names.length < totalSlotsPerDay && maxDayOT <= 0) {
+                showMsg(`❌ Lỗi: Thiếu nhân sự nhưng giới hạn OT = 0.`, "error");
+                return;
+            }
+            showMsg(actualMaxOT > 0 ? "ℹ️ Chế độ: Tăng ca xoay vòng (Thiếu nhân sự)." : "✅ Chế độ: Nhân sự đầy đủ (Không OT).", actualMaxOT > 0 ? "warning" : "success");
+
+            let workStats = {}; names.forEach(n => workStats[n] = 0);
+            scheduleData = [];
+            let dayCount = 0;
+
+            for (let w = 1; w <= weeks; w++) {
+                days.forEach(d => {
+                    dayCount++;
+                    let dayData = { day: weeks > 1 ? `${d} (W${w})` : d, shifts: {} };
+                    let assignedToday = new Set();
+                    let dayOTCount = 0;
+
+                    // QUAN TRỌNG: Đảo thứ tự xét ca theo ngày để xoay vòng OT trưa/tối
+                    // Ngày lẻ: Ưu tiên ca 14:00 (index 2) | Ngày chẵn: Ưu tiên ca 15:30 (index 3)
+                    let shiftOrder = (dayCount % 2 !== 0) ? [0, 1, 2, 3] : [1, 0, 3, 2];
+
+                    // Khởi tạo các ca trống
+                    shifts.forEach(s => dayData.shifts[s] = []);
+
+                    shiftOrder.forEach(idx => {
+                        const shiftName = shifts[idx];
+                        const needed = staffCounts[idx] || 0;
+                        let selected = dayData.shifts[shiftName];
+
+                        // 1. Xét OT nối ca (Chỉ khi thiếu người)
+                        if (actualMaxOT > 0 && idx >= 2) {
+                            let potentialOT = [];
+                            // Kiểm tra ca sáng tương ứng đã xếp chưa
+                            let morningShiftName = shifts[idx - 2];
+                            if (dayData.shifts[morningShiftName]) {
+                                dayData.shifts[morningShiftName].forEach(emp => {
+                                    if (!emp.isOT) potentialOT.push(emp.name);
+                                });
+                            }
+
+                            shuffle(potentialOT);
+                            potentialOT.sort((a, b) => workStats[a] - workStats[b]);
+
+                            while (selected.length < needed && potentialOT.length > 0 && dayOTCount < actualMaxOT) {
+                                let name = potentialOT.shift();
+                                selected.push({ name, isOT: true });
+                                workStats[name]++;
+                                dayOTCount++;
+                            }
+                        }
+
+                        // 2. Điền ca chính (Người chưa có ca hôm nay)
+                        let available = names.filter(n => !assignedToday.has(n) && !selected.find(s => s.name === n));
+                        shuffle(available);
+                        available.sort((a, b) => workStats[a] - workStats[b]);
+
+                        while (selected.length < needed && available.length > 0) {
+                            let name = available.shift();
+                            selected.push({ name, isOT: false });
+                            assignedToday.add(name);
+                            workStats[name]++;
+                        }
+
+                        // 3. Vét OT nếu vẫn thiếu
+                        if (selected.length < needed && actualMaxOT > 0) {
+                            let others = names.filter(n => !selected.find(s => s.name === n));
+                            shuffle(others);
+                            others.sort((a, b) => workStats[a] - workStats[b]);
+                            while (selected.length < needed && others.length > 0 && dayOTCount < actualMaxOT) {
+                                let name = others.shift();
+                                selected.push({ name, isOT: true });
+                                workStats[name]++;
+                                dayOTCount++;
+                            }
+                        }
+
+                        while (selected.length < needed) {
+                            selected.push({ name: "[Trống]", isOT: false, isEmpty: true });
+                        }
+                    });
+                    scheduleData.push(dayData);
+                });
+            }
+            renderAll();
+        }
+
+        function renderAll() {
+            const table = document.getElementById('schedule');
+            table.innerHTML = '';
+            if (!scheduleData.length) return;
+            const header = table.insertRow();
+            header.insertCell().innerHTML = "<b>Ngày</b>";
+            const shifts = Object.keys(scheduleData[0].shifts);
+            shifts.forEach(s => header.insertCell().innerHTML = `<b>${s}</b>`);
+
+            scheduleData.forEach((d, dIdx) => {
+                const row = table.insertRow();
+                row.insertCell().innerText = d.day;
+                shifts.forEach(sKey => {
+                    const cell = row.insertCell();
+                    d.shifts[sKey].forEach((empObj, eIdx) => {
+                        const span = document.createElement('span');
+                        span.className = empObj.isEmpty ? '' : 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
+                        span.style.color = empObj.isEmpty ? '#ccc' : '';
+                        span.innerText = empObj.name;
+                        if (!empObj.isEmpty) span.onclick = (e) => handleSwap(dIdx, sKey, eIdx, e.target);
+                        cell.appendChild(span);
+                        cell.appendChild(document.createElement('br'));
+                    });
+                });
+            });
+            updateStats();
+        }
+
+        function handleSwap(dIdx, sKey, eIdx, target) {
+            if (!selectedForSwap) {
+                selectedForSwap = { dIdx, sKey, eIdx, target };
+                target.classList.add('selected');
+            } else {
+                const first = selectedForSwap;
+                const temp = scheduleData[first.dIdx].shifts[first.sKey][first.eIdx];
+                scheduleData[first.dIdx].shifts[first.sKey][first.eIdx] = scheduleData[dIdx].shifts[sKey][eIdx];
+                scheduleData[dIdx].shifts[sKey][eIdx] = temp;
+                first.target.classList.remove('selected');
+                selectedForSwap = null;
+                renderAll();
+            }
+        }
+
+        function updateStats() {
+            const stats = {};
+            employeeNodes.forEach(i => { if (i.value.trim()) stats[i.value.trim()] = 0; });
+            scheduleData.forEach(d => {
+                Object.values(d.shifts).forEach(list => {
+                    list.forEach(e => { if (!e.isEmpty && stats[e.name] !== undefined) stats[e.name]++; });
+                });
+            });
+            const table = document.getElementById('stats');
+            table.innerHTML = `<tr><th>Nhân viên</th><th>Tổng ca làm</th></tr>`;
+            Object.entries(stats).sort((a, b) => a[1] - b[1]).forEach(([n, c]) => {
+                const row = table.insertRow();
+                row.insertCell().innerText = n;
+                row.insertCell().innerText = c + " ca";
+            });
+        }
+
+        function downloadCSV() {
+            let csv = "\uFEFFNgày," + Object.keys(scheduleData[0].shifts).join(",") + "\n";
+            scheduleData.forEach(d => {
+                let line = [d.day];
+                Object.values(d.shifts).forEach(emps => line.push(emps.map(e => e.name).join(" - ")));
+                csv += line.join(",") + "\n";
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "Lich_Xoay_Vong_OT.csv";
+            a.click();
+        }
+        window.onload = createEmployeeInputs;
+    </script>
+</body>
+
+</html>
