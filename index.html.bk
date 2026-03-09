@@ -1079,29 +1079,12 @@ function updateStats() {
 
 function downloadCSV() {
     if (!scheduleData.length) return;
-    const shifts = Object.keys(scheduleData[0].shifts);
-    const days = scheduleData.map(d => d.day);
-
-    let csv = '\uFEFF';
-    
-    csv += 'Ca làm việc,' + days.join(',') + '\n';
-    
-    shifts.forEach(shiftName => {
-        let row = [shiftName];
-        scheduleData.forEach(d => {
-            let names = d.shifts[shiftName]
-                .filter(e => !e.isEmpty)
-                .map(e => e.name)
-                .join(' - ');
-            row.push('"' + names + '"'); 
-        });
-        csv += row.join(',') + '\n';
+    let csv = '\uFEFFNgày,' + Object.keys(scheduleData[0].shifts).join(',') + '\n';
+    scheduleData.forEach(d => {
+        let line = [d.day];
+        Object.values(d.shifts).forEach(emps => line.push(emps.map(e => e.name).join(' - ')));
+        csv += line.join(',') + '\n';
     });
-
-    let noteRow = ['NOTE'];
-    scheduleData.forEach(() => noteRow.push('""'));
-    csv += noteRow.join(',') + '\n';
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1116,63 +1099,41 @@ function downloadCSV() {
 function downloadXLSX() {
     if (!scheduleData.length) return;
     const shifts = Object.keys(scheduleData[0].shifts);
-    const days = scheduleData.map(d => d.day);
     const wb = XLSX.utils.book_new();
 
-    const schedRows = [];
-    
-    schedRows.push(['Ca làm việc', ...days]);
-    
-    schedRows.push(['Ca làm việc', ...days.map(() => '')]);
-
-    shifts.forEach(s => {
-        const row = [s];
-        scheduleData.forEach(d => {
-            row.push(
-                d.shifts[s]
-                .filter(e => !e.isEmpty)
-                .map(e => e.isOT ? e.name + ' (OT)' : e.name)
-                .join(', ')
-            );
-        });
+    const schedRows = [['Ngày', ...shifts]];
+    scheduleData.forEach(d => {
+        const row = [d.day];
+        shifts.forEach(s => row.push(d.shifts[s].map(e => e.isOT ? e.name + ' (OT)' : e.name).join(', ')));
         schedRows.push(row);
     });
-
-    schedRows.push(['NOTE', ...days.map(() => '')]);
-
     const ws1 = XLSX.utils.aoa_to_sheet(schedRows);
-    
-    ws1['!cols'] = [{ wch: 15 }, ...days.map(() => ({ wch: 22 }))];
+    ws1['!cols'] = [{ wch: 14 }, ...shifts.map(() => ({ wch: 26 }))];
 
-    const range = XLSX.utils.decode_range(ws1['!ref']);
-    for (let R = 0; R <= range.e.r; R++) {
-        for (let C = 0; C <= range.e.c; C++) {
+    const headerRange = XLSX.utils.decode_range(ws1['!ref']);
+    for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws1[addr]) continue;
+        ws1[addr].s = {
+            font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Arial', sz: 10 },
+            fill: { fgColor: { rgb: '2C3E50' } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+            border: { top: { style: 'thin', color: { rgb: '444444' } }, bottom: { style: 'thin', color: { rgb: '444444' } }, left: { style: 'thin', color: { rgb: '444444' } }, right: { style: 'thin', color: { rgb: '444444' } } }
+        };
+    }
+
+    for (let R = 1; R <= headerRange.e.r; R++) {
+        const isEven = R % 2 === 0;
+        for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
             const addr = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws1[addr]) ws1[addr] = { t: 's', v: '' };
-            
-            const isHeader = R === 0 || R === 1;
-            const isFirstCol = C === 0;
-            const isNoteRow = R === range.e.r;
             const cellVal = String(ws1[addr].v || '');
             const hasOT = cellVal.includes('(OT)');
-
             ws1[addr].s = {
-                font: { 
-                    name: 'Arial', 
-                    sz: 10, 
-                    bold: isHeader || isFirstCol || isNoteRow,
-                    color: { rgb: hasOT ? 'C0162E' : (isHeader ? 'FFFFFF' : '1A1D2E') } 
-                },
-                fill: { 
-                    fgColor: { rgb: isHeader ? '8064A2' : (isNoteRow ? '00FFFF' : 'FFFFFF') } 
-                },
-                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-                border: { 
-                    top: { style: 'thin', color: { rgb: '444444' } }, 
-                    bottom: { style: 'thin', color: { rgb: '444444' } }, 
-                    left: { style: 'thin', color: { rgb: '444444' } }, 
-                    right: { style: 'thin', color: { rgb: '444444' } } 
-                }
+                font: { name: 'Arial', sz: 9, color: { rgb: hasOT ? 'C0162E' : (C === 0 ? '444444' : '1A1D2E') }, bold: C === 0 },
+                fill: { fgColor: { rgb: isEven ? 'F7F8FC' : 'FFFFFF' } },
+                alignment: { horizontal: C === 0 ? 'left' : 'center', vertical: 'center', wrapText: true },
+                border: { top: { style: 'thin', color: { rgb: 'DDDDDD' } }, bottom: { style: 'thin', color: { rgb: 'DDDDDD' } }, left: { style: 'thin', color: { rgb: 'DDDDDD' } }, right: { style: 'thin', color: { rgb: 'DDDDDD' } } }
             };
         }
     }
@@ -1202,21 +1163,15 @@ function downloadXLSX() {
             const isHeader = R2 === 0;
             const isEven = R2 % 2 === 0;
             ws2[addr].s = {
-                font: { name: 'Arial', sz: 10, bold: isHeader, color: { rgb: isHeader ? 'FFFFFF' : (C2 === 1 ? '009E94' : '1A1D2E') } },
+                font: { name: 'Arial', sz: 9, bold: isHeader, color: { rgb: isHeader ? 'FFFFFF' : (C2 === 1 ? '009E94' : '1A1D2E') } },
                 fill: { fgColor: { rgb: isHeader ? '2C3E50' : (isEven ? 'F7F8FC' : 'FFFFFF') } },
                 alignment: { horizontal: C2 === 0 ? 'left' : 'center', vertical: 'center' },
-                border: { 
-                    top: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, 
-                    bottom: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, 
-                    left: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, 
-                    right: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } } 
-                }
+                border: { top: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, bottom: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, left: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } }, right: { style: 'thin', color: { rgb: isHeader ? '444444' : 'DDDDDD' } } }
             };
             if (!isHeader && C2 === 2) ws2[addr].z = '0.0"%"';
         }
     }
     XLSX.utils.book_append_sheet(wb, ws2, 'Thống kê');
-    
     XLSX.writeFile(wb, 'AutoShift_Calendar.xlsx');
 }
 
