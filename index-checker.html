@@ -528,7 +528,7 @@
 <header class="header">
     <div class="logo">Auto<span>Shift</span><span class="logo-dot"></span></div>
     <div class="header-right">
-        <span class="header-tag">Scheduler v2.3 - MODE</span>
+        <span class="header-tag">Scheduler v2.6 - MODE</span>
         <div class="theme-toggle" id="themeToggle">
             <button onclick="setTheme('dark')" id="btnDark" class="active">Tối</button>
             <button onclick="setTheme('light')" id="btnLight">Sáng</button>
@@ -981,7 +981,7 @@ function generateSchedule() {
     renderAll();
 }
 
-// ─── TRANSPOSED renderAll: Ngày nằm ngang (header), Ca nằm dọc (row) ───
+// ─── TRANSPOSED renderAll: Ngày nằm ngang (header cố định), Tuần xếp dọc ───
 function renderAll() {
     document.getElementById('scheduleSection').style.display = 'block';
     const table = document.getElementById('schedule');
@@ -989,48 +989,80 @@ function renderAll() {
     if (!scheduleData.length) return;
 
     const shifts = Object.keys(scheduleData[0].shifts);
-    const days = scheduleData.map(d => d.day);
 
-    // HEADER ROW: ô đầu tiên trống, rồi từng ngày
+    // Lấy danh sách ngày gốc (T2, T3... không có W)
+    const dayLabels = Array.from(document.querySelectorAll('#dayCheckboxes input:checked')).map(i => i.value);
+    const numWeeks = parseInt(document.getElementById('numWeeks').value);
+    const daysPerWeek = dayLabels.length;
+
+    // HEADER ROW cố định: Ca làm việc | T2 | T3 | ... | CN
     const thead = table.createTHead();
     const hr = thead.insertRow();
     const thShift = document.createElement('th');
     thShift.innerText = 'Ca làm việc';
     hr.appendChild(thShift);
-    days.forEach(dayLabel => {
+    dayLabels.forEach(dayLabel => {
         const th = document.createElement('th');
         th.innerText = dayLabel;
         hr.appendChild(th);
     });
 
-    // BODY: mỗi hàng là một ca, mỗi cột là một ngày
     const tbody = table.createTBody();
-    shifts.forEach(shiftKey => {
-        const row = tbody.insertRow();
 
-        // Cột đầu tiên: tên ca
-        const tdShift = row.insertCell();
-        tdShift.innerText = shiftKey;
+    // Mỗi tuần là một nhóm hàng
+    for (let w = 0; w < numWeeks; w++) {
+        // Hàng tiêu đề tuần (gộp toàn bộ cột)
+        if (numWeeks > 1) {
+            const weekHeaderRow = tbody.insertRow();
+            const weekTd = weekHeaderRow.insertCell();
+            weekTd.colSpan = dayLabels.length + 1;
+            weekTd.innerText = `Tuần ${w + 1}`;
+            weekTd.style.cssText = `
+                background: var(--accent-glow);
+                color: var(--accent);
+                font-family: 'Syne', sans-serif;
+                font-weight: 700;
+                font-size: 0.78rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                padding: 8px 16px;
+                border-bottom: 1px solid var(--border);
+                text-align: left;
+            `;
+        }
 
-        // Các cột tiếp theo: nhân viên theo ngày
-        scheduleData.forEach((d, dIdx) => {
-            const cell = row.insertCell();
-            (d.shifts[shiftKey] || []).forEach((empObj, eIdx) => {
-                if (empObj.isEmpty) {
-                    const s = document.createElement('span');
-                    s.className = 'empty-slot';
-                    s.innerText = '—';
-                    cell.appendChild(s);
-                } else {
-                    const chip = document.createElement('span');
-                    chip.className = 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
-                    chip.innerText = empObj.name;
-                    chip.onclick = (e) => handleSwap(dIdx, shiftKey, eIdx, e.currentTarget);
-                    cell.appendChild(chip);
-                }
+        // Với mỗi ca, tạo 1 hàng — các cột là từng ngày trong tuần đó
+        shifts.forEach(shiftKey => {
+            const row = tbody.insertRow();
+
+            // Cột đầu: tên ca
+            const tdShift = row.insertCell();
+            tdShift.innerText = shiftKey;
+
+            // Cột ngày: lấy đúng dayData của tuần w, ngày tương ứng
+            dayLabels.forEach((_, dayIdx) => {
+                const globalDayIdx = w * daysPerWeek + dayIdx;
+                const d = scheduleData[globalDayIdx];
+                const cell = row.insertCell();
+                if (!d) return;
+
+                (d.shifts[shiftKey] || []).forEach((empObj, eIdx) => {
+                    if (empObj.isEmpty) {
+                        const s = document.createElement('span');
+                        s.className = 'empty-slot';
+                        s.innerText = '—';
+                        cell.appendChild(s);
+                    } else {
+                        const chip = document.createElement('span');
+                        chip.className = 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
+                        chip.innerText = empObj.name;
+                        chip.onclick = (e) => handleSwap(globalDayIdx, shiftKey, eIdx, e.currentTarget);
+                        cell.appendChild(chip);
+                    }
+                });
             });
         });
-    });
+    }
 
     updateStats();
 }
