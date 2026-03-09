@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoShift — Lịch Làm Việc</title>
+    <!--========== FAVICONS ==========-->
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/favicons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicons/favicon-16x16.png" />
+    <link rel="manifest" href="assets/favicons/site.webmanifest" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff" />
+    
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -419,7 +427,7 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 16px;
-            overflow: hidden;
+            overflow: auto; /* changed from hidden to auto for horizontal scroll */
             margin-bottom: 28px;
             transition: background 0.4s, border 0.4s;
         }
@@ -445,6 +453,7 @@
             vertical-align: middle;
             text-align: center;
         }
+        /* ─── TRANSPOSED: first col is now Ca (shift), first row is Ngày (day) ─── */
         tbody td:first-child {
             font-family: 'DM Mono', monospace;
             font-size: 0.8rem;
@@ -453,6 +462,10 @@
             text-align: left;
             white-space: nowrap;
             border-right: 1px solid var(--border);
+            background: var(--surface3);
+            position: sticky;
+            left: 0;
+            z-index: 1;
         }
         tbody tr:last-child td { border-bottom: none; }
 
@@ -968,6 +981,7 @@ function generateSchedule() {
     renderAll();
 }
 
+// ─── TRANSPOSED renderAll: Ngày nằm ngang (header), Ca nằm dọc (row) ───
 function renderAll() {
     document.getElementById('scheduleSection').style.display = 'block';
     const table = document.getElementById('schedule');
@@ -975,26 +989,33 @@ function renderAll() {
     if (!scheduleData.length) return;
 
     const shifts = Object.keys(scheduleData[0].shifts);
+    const days = scheduleData.map(d => d.day);
 
+    // HEADER ROW: ô đầu tiên trống, rồi từng ngày
     const thead = table.createTHead();
     const hr = thead.insertRow();
-    const thDay = document.createElement('th');
-    thDay.innerText = 'Ngày';
-    hr.appendChild(thDay);
-    shifts.forEach(s => {
+    const thShift = document.createElement('th');
+    thShift.innerText = 'Ca làm việc';
+    hr.appendChild(thShift);
+    days.forEach(dayLabel => {
         const th = document.createElement('th');
-        th.innerText = s;
+        th.innerText = dayLabel;
         hr.appendChild(th);
     });
 
+    // BODY: mỗi hàng là một ca, mỗi cột là một ngày
     const tbody = table.createTBody();
-    scheduleData.forEach((d, dIdx) => {
+    shifts.forEach(shiftKey => {
         const row = tbody.insertRow();
-        const tdDay = row.insertCell();
-        tdDay.innerText = d.day;
-        shifts.forEach(sKey => {
+
+        // Cột đầu tiên: tên ca
+        const tdShift = row.insertCell();
+        tdShift.innerText = shiftKey;
+
+        // Các cột tiếp theo: nhân viên theo ngày
+        scheduleData.forEach((d, dIdx) => {
             const cell = row.insertCell();
-            d.shifts[sKey].forEach((empObj, eIdx) => {
+            (d.shifts[shiftKey] || []).forEach((empObj, eIdx) => {
                 if (empObj.isEmpty) {
                     const s = document.createElement('span');
                     s.className = 'empty-slot';
@@ -1004,12 +1025,13 @@ function renderAll() {
                     const chip = document.createElement('span');
                     chip.className = 'emp-chip' + (empObj.isOT ? ' is-ot' : '');
                     chip.innerText = empObj.name;
-                    chip.onclick = (e) => handleSwap(dIdx, sKey, eIdx, e.currentTarget);
+                    chip.onclick = (e) => handleSwap(dIdx, shiftKey, eIdx, e.currentTarget);
                     cell.appendChild(chip);
                 }
             });
         });
     });
+
     updateStats();
 }
 
